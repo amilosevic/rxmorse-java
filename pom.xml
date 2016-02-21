@@ -28,7 +28,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>amilosevic.example.morse.RxMorse</mainClass>
+                    <mainClass>amilosevic.example.rxmorse.RxMorse</mainClass>
                     <killAfter>-1</killAfter>
                 </configuration>
             </plugin>
