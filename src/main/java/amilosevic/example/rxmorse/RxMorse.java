@@ -25,7 +25,7 @@ public class RxMorse extends JFrame {
     public static final int WIDTH = 1280;
     public static final int HEIGHT = 620;
 
-    // window inital position
+    // window initial position
     private static final int X = 60;
     private static final int Y = 60;
 
@@ -140,7 +140,7 @@ class Morse extends JPanel implements ActionListener {
                 .merge(robot, subjectivize(robot, unit))
                 .map(new Func1<Timestamped<String>, String>() {
                     @Override
-                    public String call(Timestamped<String> st){
+                    public String call(Timestamped<String> st) {
                         switch (st.getValue()) {
                             case "robotup":
                                 return "up";
@@ -156,8 +156,8 @@ class Morse extends JPanel implements ActionListener {
                     }
                 });
 
-        final Observable<String> symbols =
-                source.timeInterval()
+        final Observable<String> symbols = source
+                .timeInterval()
                 .map(new Func1<TimeInterval<String>, String>() {
                     @Override
                     public String call(TimeInterval<String> is) {
@@ -188,8 +188,8 @@ class Morse extends JPanel implements ActionListener {
                     }
                 });
 
-        final Observable<String> out =
-                symbols.scan(
+        final Observable<String> out = symbols
+                .scan(
                         new Action("wait", "*"),
                         new Func2<Action, String, Action>() {
                             @Override
@@ -230,7 +230,6 @@ class Morse extends JPanel implements ActionListener {
                 });
 
 
-
         out.subscribe(
                 new Action1<Object>() {
                     @Override
@@ -242,7 +241,6 @@ class Morse extends JPanel implements ActionListener {
                     @Override
                     public void call(Throwable throwable) {
                         throwable.printStackTrace();
-
                     }
                 },
                 new Action0() {
@@ -271,81 +269,82 @@ class Morse extends JPanel implements ActionListener {
 
         final State s = new State();
 
-        observable.subscribe(new Action1<Timestamped<String>>() {
-            @Override
-            public void call(Timestamped<String> ts) {
-                s.last = ts.getTimestampMillis();
+        observable.subscribe(
+                new Action1<Timestamped<String>>() {
+                    @Override
+                    public void call(Timestamped<String> ts) {
+                        s.last = ts.getTimestampMillis();
 
-                if (ts.getValue().endsWith("up")) {
-                    final Timestamped<String> mod3 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ls);
-                    final Timestamped<String> mod7 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ws);
-                    final Timestamped<String> mod20 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.cr);
+                        if (ts.getValue().endsWith("up")) {
+                            final Timestamped<String> mod3 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ls);
+                            final Timestamped<String> mod7 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ws);
+                            final Timestamped<String> mod20 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.cr);
 
-                    Observable.just(mod3)
-                            .delay((long) (3 * unit * 0.9), TimeUnit.MILLISECONDS)
-                            .subscribe(new Action1<Timestamped<String>>() {
-                                @Override
-                                public void call(Timestamped<String> ts1) {
-                                    if (ts1.getTimestampMillis() == s.last) {
-                                        subject.onNext(ts1);
-                                        if (s.completed) {
-                                            subject.onCompleted();
+                            Observable.just(mod3)
+                                    .delay((long) (3 * unit * 0.9), TimeUnit.MILLISECONDS)
+                                    .subscribe(new Action1<Timestamped<String>>() {
+                                        @Override
+                                        public void call(Timestamped<String> ts1) {
+                                            if (ts1.getTimestampMillis() == s.last) {
+                                                subject.onNext(ts1);
+                                                if (s.completed) {
+                                                    subject.onCompleted();
+                                                }
+                                            }
+
                                         }
-                                    }
+                                    });
 
-                                }
-                            });
+                            Observable.just(mod7)
+                                    .delay((long) (7 * unit * 0.9), TimeUnit.MILLISECONDS)
+                                    .subscribe(new Action1<Timestamped<String>>() {
+                                        @Override
+                                        public void call(Timestamped<String> ts1) {
+                                            if (ts1.getTimestampMillis() == s.last) {
+                                                subject.onNext(ts1);
+                                                if (s.completed) {
+                                                    subject.onCompleted();
+                                                }
+                                            }
 
-                    Observable.just(mod7)
-                            .delay((long) (7 * unit * 0.9), TimeUnit.MILLISECONDS)
-                            .subscribe(new Action1<Timestamped<String>>() {
-                                @Override
-                                public void call(Timestamped<String> ts1) {
-                                    if (ts1.getTimestampMillis() == s.last) {
-                                        subject.onNext(ts1);
-                                        if (s.completed) {
-                                            subject.onCompleted();
                                         }
-                                    }
+                                    });
 
-                                }
-                            });
+                            Observable.just(mod20)
+                                    .delay((long) (20 * unit * 0.9), TimeUnit.MILLISECONDS)
+                                    .subscribe(new Action1<Timestamped<String>>() {
+                                        @Override
+                                        public void call(Timestamped<String> ts1) {
+                                            if (ts1.getTimestampMillis() == s.last) {
+                                                subject.onNext(ts1);
+                                                if (s.completed) {
+                                                    subject.onCompleted();
+                                                }
+                                            }
 
-                    Observable.just(mod20)
-                            .delay((long) (20 * unit * 0.9), TimeUnit.MILLISECONDS)
-                            .subscribe(new Action1<Timestamped<String>>() {
-                                @Override
-                                public void call(Timestamped<String> ts1) {
-                                    if (ts1.getTimestampMillis() == s.last) {
-                                        subject.onNext(ts1);
-                                        if (s.completed) {
-                                            subject.onCompleted();
                                         }
-                                    }
+                                    });
 
-                                }
-                            });
-
-                }
+                        }
 
 
-            }
-        }, new Action1<Throwable>() {
-            @Override
-            public void call(Throwable throwable) {
-                subject.onError(throwable);
-            }
-        }, new Action0() {
-            @Override
-            public void call() {
-                if (!s.completed && s.last == null) {
-                    subject.onCompleted();
-                } else {
-                    s.completed = true;
-                }
+                    }
+                }, new Action1<Throwable>() {
+                    @Override
+                    public void call(Throwable throwable) {
+                        subject.onError(throwable);
+                    }
+                }, new Action0() {
+                    @Override
+                    public void call() {
+                        if (!s.completed && s.last == null) {
+                            subject.onCompleted();
+                        } else {
+                            s.completed = true;
+                        }
 
-            }
-        });
+                    }
+                });
         return subject;
     }
 }
@@ -440,7 +439,7 @@ class MorseIn implements MorseConst {
         map.put(node, new Node(left, right));
     }
 
-    public boolean in (String key) {
+    public boolean in(String key) {
         return map.containsKey(key);
     }
 
