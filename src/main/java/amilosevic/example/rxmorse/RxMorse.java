@@ -5,14 +5,14 @@ import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.functions.Func2;
+import rx.observables.SwingObservable;
 import rx.schedulers.TimeInterval;
 import rx.schedulers.Timestamped;
 import rx.subjects.PublishSubject;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
+import java.awt.event.*;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -84,6 +84,45 @@ class Morse extends JPanel implements ActionListener {
         final MorseOut morseOut = new MorseOut();
         final MorseIn morseIn = new MorseIn();
 
+        setFocusable(true);
+
+        // event gatherer
+
+        Observable<String> events = Observable.merge(
+                SwingObservable.fromKeyEvents(this).filter(new Func1<KeyEvent, Boolean>() {
+                    @Override
+                    public Boolean call(KeyEvent keyEvent) {
+                        return keyEvent.getID() == Event.KEY_PRESS || keyEvent.getID() == Event.KEY_RELEASE;
+                    }
+                }).map(new Func1<KeyEvent, String>() {
+                    @Override
+                    public String call(KeyEvent keyEvent) {
+                        switch (keyEvent.getID()){
+                            case Event.KEY_PRESS: return "keydown";
+                            case Event.KEY_RELEASE: return "keyup";
+                            default: throw new RuntimeException("");
+                        }
+                    }
+                }),
+                SwingObservable.fromMouseEvents(this).filter(new Func1<MouseEvent, Boolean>() {
+                    @Override
+                    public Boolean call(MouseEvent mouseEvent) {
+                        return mouseEvent.getID() == Event.MOUSE_DOWN || mouseEvent.getID() == Event.MOUSE_UP;
+                    }
+                }).map(new Func1<MouseEvent, String>() {
+                    @Override
+                    public String call(MouseEvent mouseEvent) {
+                        switch (mouseEvent.getID()){
+                            case Event.MOUSE_DOWN: return "mousedown";
+                            case Event.MOUSE_UP: return "mouseup";
+                            default: throw new RuntimeException("");
+                        }
+                    }
+                })
+        );
+
+
+
 
         // encoder
 
@@ -136,15 +175,22 @@ class Morse extends JPanel implements ActionListener {
 
         // decoder
 
+        Observable<Timestamped<String>> inputs
+                = Observable.merge(events.timestamp(), robot);
+
         final Observable<String> source = Observable
-                .merge(robot, subjectivize(robot, unit))
+                .merge(inputs, subjectivize(inputs, unit))
                 .map(new Func1<Timestamped<String>, String>() {
                     @Override
                     public String call(Timestamped<String> st) {
                         switch (st.getValue()) {
+                            case "mouseup":
+                            case "keyup":
                             case "robotup":
                                 return "up";
                             case "robotdown":
+                            case "mousedown":
+                            case "keydown":
                                 return "down";
                             case MorseConst.ls:
                             case MorseConst.ws:
