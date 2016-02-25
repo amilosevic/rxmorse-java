@@ -73,6 +73,14 @@ class Morse extends JPanel implements ActionListener {
     public static final String qbf = "THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG 0123456789";
     public static final String sos = "SOS";
 
+    public static final String DOWN = "down";
+    public static final String UP = "up";
+
+    public static final String ACTION_WAIT = "wait";
+    public static final String ACTION_OUT = "out";
+
+    public static final String _TOP_ = "*";
+
     /**
      * Creates a new <code>JPanel</code> with a double buffer
      * and a flow layout.
@@ -187,11 +195,11 @@ class Morse extends JPanel implements ActionListener {
                             case "mouseup":
                             case "keyup":
                             case "robotup":
-                                return "up";
+                                return UP;
                             case "robotdown":
                             case "mousedown":
                             case "keydown":
-                                return "down";
+                                return DOWN;
                             case MorseConst.ls:
                             case MorseConst.ws:
                             case MorseConst.cr:
@@ -207,13 +215,13 @@ class Morse extends JPanel implements ActionListener {
                 .map(new Func1<TimeInterval<String>, String>() {
                     @Override
                     public String call(TimeInterval<String> is) {
-                        if (is.getValue().equals("up")) {
+                        if (is.getValue().equals(UP)) {
                             if (is.getIntervalInMilliseconds() < 1.5 * unit) {
                                 return MorseConst.dit;
                             } else {
                                 return MorseConst.dah;
                             }
-                        } else if (is.getValue().equals("down")) {
+                        } else if (is.getValue().equals(DOWN)) {
                             return null;
                         } else if (is.getValue().equals(MorseConst.ls)) {
                             return MorseConst.ls;
@@ -236,26 +244,26 @@ class Morse extends JPanel implements ActionListener {
 
         final Observable<String> out = symbols
                 .scan(
-                        new Action("wait", "*"),
+                        new Action(ACTION_WAIT, _TOP_),
                         new Func2<Action, String, Action>() {
                             @Override
                             public Action call(Action acc, String s) {
                                 switch (s) {
                                     case MorseConst.ls:
-                                        return new Action("out", acc.state);
+                                        return new Action(ACTION_OUT, acc.state);
                                     case MorseConst.ws:
-                                        return new Action("out", " ");
+                                        return new Action(ACTION_OUT, " ");
                                     case MorseConst.cr:
-                                        return new Action("out", "\n");
+                                        return new Action(ACTION_OUT, "\n");
 
                                     case MorseConst.dit:
                                     case MorseConst.dah:
-                                        final String key = acc.action.equals("out") ? "*" : acc.state;
+                                        final String key = acc.action.equals(ACTION_OUT) ? _TOP_ : acc.state;
 
                                         if (!morseIn.in(key)) {
                                             throw new RuntimeException("Unknown key: " + key + " s: " + s);
                                         } else {
-                                            return new Action("wait", morseIn.down(key, s));
+                                            return new Action(ACTION_WAIT, morseIn.down(key, s));
                                         }
                                     default:
                                         throw new RuntimeException("!!");
@@ -266,7 +274,7 @@ class Morse extends JPanel implements ActionListener {
                 ).filter(new Func1<Action, Boolean>() {
                     @Override
                     public Boolean call(Action action) {
-                        return action.action.equals("out");
+                        return action.action.equals(ACTION_OUT);
                     }
                 }).map(new Func1<Action, String>() {
                     @Override
@@ -321,7 +329,7 @@ class Morse extends JPanel implements ActionListener {
                     public void call(Timestamped<String> ts) {
                         s.last = ts.getTimestampMillis();
 
-                        if (ts.getValue().endsWith("up")) {
+                        if (ts.getValue().endsWith(UP)) {
                             final Timestamped<String> mod3 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ls);
                             final Timestamped<String> mod7 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ws);
                             final Timestamped<String> mod20 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.cr);
@@ -400,16 +408,6 @@ class State {
     boolean completed = false;
 }
 
-
-class Node {
-    public final String dah;
-    public final String dit;
-
-    public Node(String dah, String dit) {
-        this.dah = dah;
-        this.dit = dit;
-    }
-}
 
 interface MorseConst {
     static final String dit = "=";
@@ -499,6 +497,16 @@ class MorseIn implements MorseConst {
             throw new RuntimeException("node");
         }
     }
+
+    static class Node {
+        public final String dah;
+        public final String dit;
+
+        public Node(String dah, String dit) {
+            this.dah = dah;
+            this.dit = dit;
+        }
+    }
 }
 
 
@@ -566,6 +574,7 @@ class MorseOut implements MorseConst {
     public String[] code(String key) {
         return map.get(key);
     }
+
 }
 
 class Action {
