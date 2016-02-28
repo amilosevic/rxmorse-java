@@ -76,9 +76,6 @@ class Morse extends JPanel implements ActionListener {
     public static final String DOWN = "down";
     public static final String UP = "up";
 
-    public static final String ACTION_WAIT = "wait";
-    public static final String ACTION_OUT = "out";
-
     /**
      * Creates a new <code>JPanel</code> with a double buffer
      * and a flow layout.
