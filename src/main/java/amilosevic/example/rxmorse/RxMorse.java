@@ -79,8 +79,6 @@ class Morse extends JPanel implements ActionListener {
     public static final String ACTION_WAIT = "wait";
     public static final String ACTION_OUT = "out";
 
-    public static final String _TOP_ = "*";
-
     /**
      * Creates a new <code>JPanel</code> with a double buffer
      * and a flow layout.
@@ -244,27 +242,24 @@ class Morse extends JPanel implements ActionListener {
 
         final Observable<String> out = symbols
                 .scan(
-                        new Action(ACTION_WAIT, _TOP_),
+                        new Wait(MorseIn.TOP),
                         new Func2<Action, String, Action>() {
                             @Override
                             public Action call(Action acc, String s) {
                                 switch (s) {
                                     case MorseConst.ls:
-                                        return new Action(ACTION_OUT, acc.state);
+                                        return new Out(acc.state);
                                     case MorseConst.ws:
-                                        return new Action(ACTION_OUT, " ");
+                                        return Out.WS;
                                     case MorseConst.cr:
-                                        return new Action(ACTION_OUT, "\n");
+                                        return Out.CR;
 
                                     case MorseConst.dit:
                                     case MorseConst.dah:
-                                        final String key = acc.action.equals(ACTION_OUT) ? _TOP_ : acc.state;
+                                        final String key = acc instanceof Out ? MorseIn.TOP : acc.state;
 
-                                        if (!morseIn.in(key)) {
-                                            throw new RuntimeException("Unknown key: " + key + " s: " + s);
-                                        } else {
-                                            return new Action(ACTION_WAIT, morseIn.down(key, s));
-                                        }
+                                        return new Wait(morseIn.down(key, s));
+
                                     default:
                                         throw new RuntimeException("!!");
 
@@ -274,7 +269,7 @@ class Morse extends JPanel implements ActionListener {
                 ).filter(new Func1<Action, Boolean>() {
                     @Override
                     public Boolean call(Action action) {
-                        return action.action.equals(ACTION_OUT);
+                        return action instanceof Out;
                     }
                 }).map(new Func1<Action, String>() {
                     @Override
@@ -403,7 +398,7 @@ class Morse extends JPanel implements ActionListener {
     }
 }
 
-class State {
+final class State {
     Long last = null;
     boolean completed = false;
 }
@@ -427,6 +422,8 @@ interface MorseConst {
 
 class MorseIn implements MorseConst {
 
+    public static final String TOP = "__top__";
+    public static final String ERR = "__err__";
     private final HashMap<String, Node> map = new HashMap<>();
 
     /**
@@ -436,7 +433,7 @@ class MorseIn implements MorseConst {
     public MorseIn() {
         super();
         // 0 level
-        in("*", "T", "E");
+        in(TOP, "T", "E");
 
         // I level
         in("T", "M", "N");
@@ -460,22 +457,23 @@ class MorseIn implements MorseConst {
 
         // IV level
         in("CH", "0", "9");
-        in("Ö", null, "8");
+        in("Ö", ERR, "8");
         in("Q", "Ñ", "Ĝ");
-        in("Z", "_Z", "7");
-        in("Y", null, "Ĥ");
-        in("C", "_C", "Ç");
-        in("X", null, "/");
+        in("Z", ERR, "7");
+        in("Y", ERR, "Ĥ");
+        in("C", ERR, "Ç");
+        in("X", ERR, "/");
         in("B", "=", "6");
         in("J", "1", "Ĵ");
         in("P", "Á", "Þ");
-        in("Ä", null, "+");
-        in("L", "È", null);
+        in("Ä", ERR, "+");
+        in("L", "È", ERR);
         in("Ü", "2", "Đ");
-        in("F", null, "É");
+        in("F", ERR, "É");
         in("V", "3", "Ŝ");
         in("H", "4", "5");
 
+        //in(ERR, ERR, ERR);
 
     }
 
@@ -483,11 +481,11 @@ class MorseIn implements MorseConst {
         map.put(node, new Node(left, right));
     }
 
-    public boolean in(String key) {
-        return map.containsKey(key);
-    }
-
     public String down(final String key, final String symbol) {
+        if (!map.containsKey(key)) {
+            return ERR;
+        }
+
         final Node node = map.get(key);
         if (symbol.equals(MorseConst.dah)) {
             return node.dah;
@@ -498,7 +496,7 @@ class MorseIn implements MorseConst {
         }
     }
 
-    static class Node {
+    private static class Node {
         public final String dah;
         public final String dit;
 
@@ -577,23 +575,36 @@ class MorseOut implements MorseConst {
 
 }
 
-class Action {
-    public final String action;
+abstract class Action {
+
     public final String state;
 
-    public Action(String action, String state) {
-        if (action == null) {
-            throw new IllegalArgumentException("");
-        }
-        this.action = action;
+    protected Action(String state) {
         this.state = state;
     }
 
     @Override
     public String toString() {
         return "Action{" +
-                "action='" + action + '\'' +
+                "action='" + this.getClass().getSimpleName() + '\'' +
                 ", state='" + state + '\'' +
                 '}';
+    }
+}
+
+final class Wait extends Action {
+
+    public Wait(String state) {
+        super(state);
+    }
+}
+
+final class Out extends Action {
+
+    static final Out WS = new Out(" ");
+    static final Out CR = new Out("\n");
+
+    public Out(String state) {
+        super(state);
     }
 }
