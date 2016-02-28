@@ -10,9 +10,12 @@ import rx.schedulers.TimeInterval;
 import rx.schedulers.Timestamped;
 import rx.subjects.PublishSubject;
 
+import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -82,7 +85,9 @@ class Morse extends JPanel implements ActionListener {
      */
     public Morse() {
 
-        final int unit = 130;
+        final int unit = 140;
+
+        final Clip clip = speaker();
 
         final MorseOut morseOut = new MorseOut();
         final MorseIn morseIn = new MorseIn();
@@ -205,6 +210,20 @@ class Morse extends JPanel implements ActionListener {
                     }
                 });
 
+        if (clip != null) {
+            source.subscribe(new Action1<String>() {
+                @Override
+                public void call(String s) {
+                    if (s.equals(DOWN)) {
+                        clip.setMicrosecondPosition(0);
+                        clip.start();
+                    } else if (s.equals(UP)) {
+                        clip.stop();
+                    }
+                }
+            });
+        }
+
         final Observable<String> symbols = source
                 .timeInterval()
                 .map(new Func1<TimeInterval<String>, String>() {
@@ -298,6 +317,27 @@ class Morse extends JPanel implements ActionListener {
         );
 
 
+    }
+
+    private Clip speaker() {
+
+        try {
+            Clip clip = AudioSystem.getClip();
+            final InputStream resourceAsStream = getClass().getClassLoader().getResourceAsStream("wavTones.com.unregistred.sin_500Hz_-20dBFS_3s.wav");
+            AudioInputStream stream = AudioSystem.getAudioInputStream(resourceAsStream);
+
+            clip.open(stream);
+
+            return clip;
+        } catch (LineUnavailableException e) {
+
+        } catch (UnsupportedAudioFileException ae) {
+
+        } catch (IOException ioe) {
+
+        }
+
+        return null;
     }
 
     /**
