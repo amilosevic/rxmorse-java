@@ -6,14 +6,17 @@ import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.functions.Func2;
 import rx.observables.SwingObservable;
+import rx.schedulers.SwingScheduler;
 import rx.schedulers.TimeInterval;
 import rx.schedulers.Timestamped;
 import rx.subjects.PublishSubject;
 
+import javax.imageio.ImageIO;
 import javax.sound.sampled.*;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -25,15 +28,15 @@ import java.util.concurrent.TimeUnit;
 public class RxMorse extends JFrame {
 
     // window dimensions
-    public static final int WIDTH = 1280;
-    public static final int HEIGHT = 620;
+    public static final int WIDTH = 780;
+    public static final int HEIGHT = 600;
 
     // window initial position
     private static final int X = 60;
     private static final int Y = 60;
 
     // title
-    private static final String TITLE = "RxMorse";
+    public static final String TITLE = "RxMorse";
 
     /**
      * Constructs a new frame that is initially invisible.
@@ -85,6 +88,37 @@ class Morse extends JPanel implements ActionListener {
      */
     public Morse() {
 
+        final JTextArea ticker = new JTextArea();
+        final JScrollPane pane = new JScrollPane(ticker);
+        ticker.setLineWrap(true);
+
+        final JTextField text = new JTextField();
+
+        final JButton button = new JButton("Send SOS!");
+
+        final JPanel image = new JPanel();
+        image.add(new JLabel(new ImageIcon(image())));
+        image.setBackground(Color.WHITE);
+
+        final JPanel pad = new JPanel();
+        pad.setBackground(Color.ORANGE);
+
+        setLayout(null);
+
+        add(pad);
+        add(pane);
+        add(image);
+        add(text);
+        add(button);
+
+        pad.setBounds(10, 10, 250, 250);
+        image.setBounds(260 + 10, 10, 500, 520);
+        text.setBounds(10, 10 + 520 + 10, 600, 20);
+        button.setBounds(10 + 600 + 10, 10 + 520 + 10, 150, 20);
+        pane.setBounds(10, 260 + 10, 250, 260);
+
+
+        // mechanics
         final int unit = 140;
 
         final Clip clip = speaker();
@@ -96,7 +130,35 @@ class Morse extends JPanel implements ActionListener {
 
         // event gatherer
 
-        Observable<String> events = Observable.merge(
+        final Observable<String> texts = SwingObservable.fromKeyEvents(text).filter(new Func1<KeyEvent, Boolean>() {
+            @Override
+            public Boolean call(KeyEvent keyEvent) {
+                return keyEvent.getID() == KeyEvent.KEY_RELEASED && keyEvent.getKeyChar() == '\n';
+            }
+        }).map(new Func1<KeyEvent, String>() {
+            @Override
+            public String call(KeyEvent keyEvent) {
+                final String text1 = text.getText();
+                text.setText("");
+                return text1.toUpperCase();
+            }
+        });
+
+        final Observable<String> clicks = SwingObservable.fromButtonAction(button).filter(new Func1<ActionEvent, Boolean>() {
+            @Override
+            public Boolean call(ActionEvent actionEvent) {
+                return actionEvent.getID() == ActionEvent.ACTION_PERFORMED;
+            }
+        }).map(new Func1<ActionEvent, String>() {
+            @Override
+            public String call(ActionEvent actionEvent) {
+                return sos;
+            }
+        });
+
+        final Observable<String> clicksAndTexts = Observable.merge(clicks, texts);
+
+        final Observable<String> events = Observable.merge(
                 SwingObservable.fromKeyEvents(this).filter(new Func1<KeyEvent, Boolean>() {
                     @Override
                     public Boolean call(KeyEvent keyEvent) {
@@ -112,7 +174,7 @@ class Morse extends JPanel implements ActionListener {
                         }
                     }
                 }),
-                SwingObservable.fromMouseEvents(this).filter(new Func1<MouseEvent, Boolean>() {
+                SwingObservable.fromMouseEvents(pad).filter(new Func1<MouseEvent, Boolean>() {
                     @Override
                     public Boolean call(MouseEvent mouseEvent) {
                         return mouseEvent.getID() == Event.MOUSE_DOWN || mouseEvent.getID() == Event.MOUSE_UP;
@@ -134,17 +196,31 @@ class Morse extends JPanel implements ActionListener {
 
         // encoder
 
+        final Observable<String> flatten = clicksAndTexts.delay(500, TimeUnit.MILLISECONDS)
+                .concatMap(new Func1<String, Observable<? extends String>>() {
+                    @Override
+                    public Observable<? extends String> call(String s) {
+                        return Observable.concat(
+                                Observable.from(s.split("")),
+                                Observable.just("\n")
+                            );
+                    }
+                });
+
         final Observable<Timestamped<String>> robot =
-                Observable.from(qbf.split(""))
-                        .delay(1000, TimeUnit.MILLISECONDS)
+                flatten
                         .concatMap(new Func1<String, Observable<String>>() {
                             @Override
                             public Observable<String> call(String s) {
                                 if (morseOut.in(s)) {
                                     return Observable.concat(
                                             Observable.from(morseOut.code(s)),
-                                            Observable.just(MorseConst.sss)
+                                            Observable.just(MorseConst.sx3)
                                     );
+                                } else if (" ".equals(s)) {
+                                    return Observable.just(MorseConst.sx7);
+                                } else if ("\n".equals(s)) {
+                                    return Observable.just(MorseConst.sx20);
                                 } else {
                                     return Observable.error(new Error("** " + s));
                                 }
@@ -167,10 +243,12 @@ class Morse extends JPanel implements ActionListener {
                                                 Observable.<String>empty().delay(1 * unit, TimeUnit.MILLISECONDS)
                                         );
 
-                                    case MorseConst.sss:
+                                    case MorseConst.sx3:
                                         return rx.Observable.<String>empty().delay(3 * unit, TimeUnit.MILLISECONDS);
-                                    case MorseConst.sssssss:
+                                    case MorseConst.sx7:
                                         return rx.Observable.<String>empty().delay(7 * unit, TimeUnit.MILLISECONDS);
+                                    case MorseConst.sx20:
+                                        return rx.Observable.<String>empty().delay(20 * unit, TimeUnit.MILLISECONDS);
 
                                     default:
                                         return rx.Observable.error(new Error("*** " + s));
@@ -186,8 +264,7 @@ class Morse extends JPanel implements ActionListener {
         Observable<Timestamped<String>> inputs
                 = Observable.merge(events.timestamp(), robot);
 
-        final Observable<String> source = Observable
-                .merge(inputs, subjectivize(inputs, unit))
+        final Observable<String> source = subjectivize(inputs, unit)
                 .map(new Func1<Timestamped<String>, String>() {
                     @Override
                     public String call(Timestamped<String> st) {
@@ -209,6 +286,19 @@ class Morse extends JPanel implements ActionListener {
                         }
                     }
                 });
+
+        source.observeOn(SwingScheduler.getInstance()).subscribe(new Action1<String>() {
+            @Override
+            public void call(String s) {
+                System.out.println(s);
+                checkOnUiThread("pad painter");
+                if (s.equals(DOWN)) {
+                    pad.setBackground(Color.BLACK);
+                } else if (s.equals(UP)) {
+                    pad.setBackground(Color.WHITE);
+                }
+            }
+        });
 
         if (clip != null) {
             source.subscribe(new Action1<String>() {
@@ -242,7 +332,7 @@ class Morse extends JPanel implements ActionListener {
                         } else if (is.getValue().equals(MorseConst.ws)) {
                             return MorseConst.ws;
                         } else if (is.getValue().equals(MorseConst.cr)) {
-                            return MorseConst.ws;
+                            return MorseConst.cr;
                         } else {
                             System.out.println("unhandled: " + is.getValue());
                             return null;
@@ -295,11 +385,12 @@ class Morse extends JPanel implements ActionListener {
                 });
 
 
-        out.subscribe(
+        out.observeOn(SwingScheduler.getInstance()).subscribe(
                 new Action1<Object>() {
                     @Override
                     public void call(Object o) {
-                        System.out.print(o.toString());
+                        //System.out.print(o.toString());
+                        ticker.setText(ticker.getText() + o.toString());
                     }
                 },
                 new Action1<Throwable>() {
@@ -317,6 +408,15 @@ class Morse extends JPanel implements ActionListener {
         );
 
 
+    }
+
+    private BufferedImage image() {
+        try {
+            return ImageIO.read(getClass().getClassLoader().getResourceAsStream("International_Morse_Code.PNG"));
+        } catch (IOException io) {
+
+        }
+        return null;
     }
 
     private Clip speaker() {
@@ -360,6 +460,7 @@ class Morse extends JPanel implements ActionListener {
                     @Override
                     public void call(Timestamped<String> ts) {
                         s.last = ts.getTimestampMillis();
+                        subject.onNext(ts);
 
                         if (ts.getValue().endsWith(UP)) {
                             final Timestamped<String> mod3 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ls);
@@ -433,6 +534,17 @@ class Morse extends JPanel implements ActionListener {
                 });
         return subject;
     }
+
+    void checkOnUiThread(String whereAreWe) {
+        System.out.println(
+                (SwingUtilities.isEventDispatchThread() ? "" : "(BAD: not on UI thread)") +
+                        threadDescription(whereAreWe)
+        );
+    }
+
+    String threadDescription(String whereAreWe) {
+        return "[" + Thread.currentThread().getId() + "] " + whereAreWe;
+    }
 }
 
 final class State {
@@ -446,8 +558,9 @@ interface MorseConst {
     static final String dah = "===";
 
     static final String s = "."; // space
-    static final String sss = "..."; // letter space
-    static final String sssssss = "......."; // word space
+    static final String sx3 = "..."; // letter space
+    static final String sx7 = "......."; // word space
+    static final String sx20 = "...................."; // sentance space = cariage return
 
     static final String ss = "SS";
     static final String ls = "LS";
@@ -594,7 +707,7 @@ class MorseOut implements MorseConst {
         out("9", dah, dah, dah, dah, dit);
         out("0", dah, dah, dah, dah, dah);
 
-        out(" ", sssssss);
+        //out(" ", sx7);
 
     }
 
