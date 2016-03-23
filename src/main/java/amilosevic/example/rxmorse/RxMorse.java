@@ -52,23 +52,23 @@ public class RxMorse extends JFrame {
      * @see javax.swing.JComponent#getDefaultLocale
      */
     public RxMorse() throws HeadlessException {
-        super();
+        //super();
+        setSize(new Dimension(WIDTH, HEIGHT));
+        add(new Morse());
 
-        setSize(WIDTH, HEIGHT);
-        setLocation(X, Y);
+        setLocationRelativeTo(null);
         setResizable(false);
         setTitle(TITLE);
 
-        setVisible(true);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
-        add(new Morse());
+
     }
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
-                new RxMorse();
+                new RxMorse().setVisible(true);
             }
         });
     }
@@ -82,15 +82,20 @@ class Morse extends JPanel implements ActionListener {
     public static final String DOWN = "down";
     public static final String UP = "up";
 
+    private Color background = Color.WHITE;
+
     /**
      * Creates a new <code>JPanel</code> with a double buffer
      * and a flow layout.
      */
     public Morse() {
+        super();
 
         final JTextArea ticker = new JTextArea();
         final JScrollPane pane = new JScrollPane(ticker);
         ticker.setLineWrap(true);
+        ticker.setFocusable(false);
+        ticker.setEditable(false);
 
         final JTextField text = new JTextField();
 
@@ -100,8 +105,20 @@ class Morse extends JPanel implements ActionListener {
         image.add(new JLabel(new ImageIcon(image())));
         image.setBackground(Color.WHITE);
 
-        final JPanel pad = new JPanel();
-        pad.setBackground(Color.ORANGE);
+        final JPanel pad = new JPanel() {
+
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                g.setColor(background);
+                g.fillRect(0,0,250,250);
+                Toolkit.getDefaultToolkit().sync();
+            }
+        };
+        pad.setOpaque(true);
+        pad.setBackground(background);
+        pad.setFocusable(true);
+
 
         setLayout(null);
 
@@ -117,16 +134,14 @@ class Morse extends JPanel implements ActionListener {
         button.setBounds(10 + 600 + 10, 10 + 520 + 10, 150, 20);
         pane.setBounds(10, 260 + 10, 250, 260);
 
-
         // mechanics
-        final int unit = 140;
+        final int unit = 150;
 
         final Clip clip = speaker();
 
         final MorseOut morseOut = new MorseOut();
         final MorseIn morseIn = new MorseIn();
 
-        setFocusable(true);
 
         // event gatherer
 
@@ -159,7 +174,7 @@ class Morse extends JPanel implements ActionListener {
         final Observable<String> clicksAndTexts = Observable.merge(clicks, texts);
 
         final Observable<String> events = Observable.merge(
-                SwingObservable.fromKeyEvents(this).filter(new Func1<KeyEvent, Boolean>() {
+                SwingObservable.fromKeyEvents(pad).filter(new Func1<KeyEvent, Boolean>() {
                     @Override
                     public Boolean call(KeyEvent keyEvent) {
                         return keyEvent.getID() == Event.KEY_PRESS || keyEvent.getID() == Event.KEY_RELEASE;
@@ -207,7 +222,7 @@ class Morse extends JPanel implements ActionListener {
                     }
                 });
 
-        final Observable<Timestamped<String>> robot =
+        final Observable<String> robot =
                 flatten
                         .concatMap(new Func1<String, Observable<String>>() {
                             @Override
@@ -255,20 +270,20 @@ class Morse extends JPanel implements ActionListener {
 
                                 }
                             }
-                        })
-                        .timestamp();
+                        });
 
 
         // decoder
 
-        Observable<Timestamped<String>> inputs
-                = Observable.merge(events.timestamp(), robot);
+        Observable<String> inputs
+                = Observable.merge(events.distinctUntilChanged(), robot);
 
         final Observable<String> source = subjectivize(inputs, unit)
-                .map(new Func1<Timestamped<String>, String>() {
+                .map(new Func1<String, String>() {
+
                     @Override
-                    public String call(Timestamped<String> st) {
-                        switch (st.getValue()) {
+                    public String call(String st) {
+                        switch (st) {
                             case "mouseup":
                             case "keyup":
                             case "robotup":
@@ -280,25 +295,24 @@ class Morse extends JPanel implements ActionListener {
                             case MorseConst.ls:
                             case MorseConst.ws:
                             case MorseConst.cr:
-                                return st.getValue();
+                                return st;
                             default:
                                 throw new RuntimeException("!");
                         }
                     }
                 });
 
-        source.observeOn(SwingScheduler.getInstance()).subscribe(new Action1<String>() {
+        source.subscribe(new Action1<String>() {
             @Override
             public void call(String s) {
-                System.out.println(s);
-                checkOnUiThread("pad painter");
                 if (s.equals(DOWN)) {
-                    pad.setBackground(Color.BLACK);
+                    background = Color.BLACK;
                 } else if (s.equals(UP)) {
-                    pad.setBackground(Color.WHITE);
+                    background = Color.WHITE;
                 }
             }
         });
+
 
         if (clip != null) {
             source.subscribe(new Action1<String>() {
@@ -346,6 +360,13 @@ class Morse extends JPanel implements ActionListener {
                     }
                 });
 
+        symbols.subscribe(new Action1<String>() {
+            @Override
+            public void call(String s) {
+                System.out.println(s);
+            }
+        });
+
         final Observable<String> out = symbols
                 .scan(
                         new Wait(MorseIn.TOP),
@@ -384,13 +405,11 @@ class Morse extends JPanel implements ActionListener {
                     }
                 });
 
-
         out.observeOn(SwingScheduler.getInstance()).subscribe(
                 new Action1<Object>() {
                     @Override
                     public void call(Object o) {
-                        //System.out.print(o.toString());
-                        ticker.setText(ticker.getText() + o.toString());
+                        ticker.append(o.toString());
                     }
                 },
                 new Action1<Throwable>() {
@@ -407,6 +426,9 @@ class Morse extends JPanel implements ActionListener {
                 }
         );
 
+        // to smooth animation
+        Timer timer = new Timer(25, this);
+        timer.start();
 
     }
 
@@ -450,17 +472,17 @@ class Morse extends JPanel implements ActionListener {
         repaint();
     }
 
-    protected Observable<Timestamped<String>> subjectivize(Observable<Timestamped<String>> observable, final int unit) {
-        final PublishSubject<Timestamped<String>> subject = PublishSubject.create();
+    protected Observable<String> subjectivize(Observable<String> observable, final int unit) {
+        final PublishSubject<String> subject = PublishSubject.create();
 
         final State s = new State();
 
-        observable.subscribe(
+        observable.timestamp().subscribe(
                 new Action1<Timestamped<String>>() {
                     @Override
                     public void call(Timestamped<String> ts) {
                         s.last = ts.getTimestampMillis();
-                        subject.onNext(ts);
+                        subject.onNext(ts.getValue());
 
                         if (ts.getValue().endsWith(UP)) {
                             final Timestamped<String> mod3 = new Timestamped<>(ts.getTimestampMillis(), MorseConst.ls);
@@ -473,7 +495,7 @@ class Morse extends JPanel implements ActionListener {
                                         @Override
                                         public void call(Timestamped<String> ts1) {
                                             if (ts1.getTimestampMillis() == s.last) {
-                                                subject.onNext(ts1);
+                                                subject.onNext(ts1.getValue());
                                                 if (s.completed) {
                                                     subject.onCompleted();
                                                 }
@@ -488,7 +510,7 @@ class Morse extends JPanel implements ActionListener {
                                         @Override
                                         public void call(Timestamped<String> ts1) {
                                             if (ts1.getTimestampMillis() == s.last) {
-                                                subject.onNext(ts1);
+                                                subject.onNext(ts1.getValue());
                                                 if (s.completed) {
                                                     subject.onCompleted();
                                                 }
@@ -503,7 +525,7 @@ class Morse extends JPanel implements ActionListener {
                                         @Override
                                         public void call(Timestamped<String> ts1) {
                                             if (ts1.getTimestampMillis() == s.last) {
-                                                subject.onNext(ts1);
+                                                subject.onNext(ts1.getValue());
                                                 if (s.completed) {
                                                     subject.onCompleted();
                                                 }
@@ -543,7 +565,7 @@ class Morse extends JPanel implements ActionListener {
     }
 
     String threadDescription(String whereAreWe) {
-        return "[" + Thread.currentThread().getId() + "] " + whereAreWe;
+        return "[" + Thread.currentThread().getName() + "] " + whereAreWe;
     }
 }
 
@@ -562,7 +584,6 @@ interface MorseConst {
     static final String sx7 = "......."; // word space
     static final String sx20 = "...................."; // sentance space = cariage return
 
-    static final String ss = "SS";
     static final String ls = "LS";
     static final String ws = "WS";
     static final String cr = "CR";
@@ -622,8 +643,6 @@ class MorseIn implements MorseConst {
         in("F", ERR, "É");
         in("V", "3", "Ŝ");
         in("H", "4", "5");
-
-        //in(ERR, ERR, ERR);
 
     }
 
@@ -707,7 +726,6 @@ class MorseOut implements MorseConst {
         out("9", dah, dah, dah, dah, dit);
         out("0", dah, dah, dah, dah, dah);
 
-        //out(" ", sx7);
 
     }
 
