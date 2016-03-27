@@ -208,7 +208,7 @@ class Morse extends JPanel implements ActionListener {
                         }
                     }
                 })
-        );
+        ).distinctUntilChanged();
 
 
 
@@ -279,8 +279,7 @@ class Morse extends JPanel implements ActionListener {
 
         // decoder
 
-        Observable<String> inputs
-                = Observable.merge(events.distinctUntilChanged(), robot);
+        Observable<String> inputs = Observable.merge(events, robot);
 
         final ConnectableObservable<String> source = /*subjectivize(inputs, unit) */ inputs.lift(new OperatorCompleteMorse(unit))
                 .map(new Func1<String, String>() {
