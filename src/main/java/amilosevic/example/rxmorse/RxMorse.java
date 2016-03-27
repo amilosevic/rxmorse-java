@@ -1,11 +1,15 @@
 package amilosevic.example.rxmorse;
 
 import rx.Observable;
+import rx.Scheduler;
+import rx.Subscriber;
 import rx.functions.Action0;
 import rx.functions.Action1;
 import rx.functions.Func1;
 import rx.functions.Func2;
+import rx.observables.ConnectableObservable;
 import rx.observables.SwingObservable;
+import rx.schedulers.Schedulers;
 import rx.schedulers.SwingScheduler;
 import rx.schedulers.TimeInterval;
 import rx.schedulers.Timestamped;
@@ -167,7 +171,7 @@ class Morse extends JPanel implements ActionListener {
         }).map(new Func1<ActionEvent, String>() {
             @Override
             public String call(ActionEvent actionEvent) {
-                return sos;
+                return qbf;
             }
         });
 
@@ -278,7 +282,7 @@ class Morse extends JPanel implements ActionListener {
         Observable<String> inputs
                 = Observable.merge(events.distinctUntilChanged(), robot);
 
-        final Observable<String> source = subjectivize(inputs, unit)
+        final ConnectableObservable<String> source = /*subjectivize(inputs, unit) */ inputs.lift(new OperatorCompleteMorse(unit))
                 .map(new Func1<String, String>() {
 
                     @Override
@@ -300,7 +304,7 @@ class Morse extends JPanel implements ActionListener {
                                 throw new RuntimeException("!");
                         }
                     }
-                });
+                }).publish();
 
         source.subscribe(new Action1<String>() {
             @Override
@@ -360,12 +364,6 @@ class Morse extends JPanel implements ActionListener {
                     }
                 });
 
-        symbols.subscribe(new Action1<String>() {
-            @Override
-            public void call(String s) {
-                System.out.println(s);
-            }
-        });
 
         final Observable<String> out = symbols
                 .scan(
@@ -430,6 +428,8 @@ class Morse extends JPanel implements ActionListener {
         Timer timer = new Timer(25, this);
         timer.start();
 
+        source.connect();
+
     }
 
     private BufferedImage image() {
@@ -472,7 +472,8 @@ class Morse extends JPanel implements ActionListener {
         repaint();
     }
 
-    protected Observable<String> subjectivize(Observable<String> observable, final int unit) {
+    
+    protected Observable<String> completeMorseUsingSubjects(Observable<String> observable, final int unit) {
         final PublishSubject<String> subject = PublishSubject.create();
 
         final State s = new State();
@@ -538,12 +539,14 @@ class Morse extends JPanel implements ActionListener {
 
 
                     }
-                }, new Action1<Throwable>() {
+                }
+                ,new Action1<Throwable>() {
                     @Override
                     public void call(Throwable throwable) {
                         subject.onError(throwable);
                     }
-                }, new Action0() {
+                },
+                new Action0() {
                     @Override
                     public void call() {
                         if (!s.completed && s.last == null) {
@@ -557,11 +560,123 @@ class Morse extends JPanel implements ActionListener {
         return subject;
     }
 
-    void checkOnUiThread(String whereAreWe) {
-        System.out.println(
-                (SwingUtilities.isEventDispatchThread() ? "" : "(BAD: not on UI thread)") +
-                        threadDescription(whereAreWe)
-        );
+    private static class OperatorCompleteMorse implements Observable.Operator<String, String> {
+
+        final Scheduler scheduler;
+        final int unit;
+
+        public OperatorCompleteMorse(int unit) {
+            this(unit, Schedulers.computation());
+
+        }
+
+        public OperatorCompleteMorse(int unit, Scheduler scheduler) {
+            this.scheduler = scheduler;
+            this.unit = unit;
+        }
+
+        @Override
+        public Subscriber<? super String> call(final Subscriber<? super String> child) {
+            final Scheduler.Worker worker = scheduler.createWorker();
+            child.add(worker);
+
+            System.out.println("call() " + child.toString());
+
+            return new Subscriber<String>(child) {
+
+                boolean completed = false;
+                boolean error = false;
+                Long last = null;
+
+
+                @Override
+                public void onCompleted() {
+                    worker.schedule(new Action0() {
+                        @Override
+                        public void call() {
+
+                            if (!error && last == null && !completed) {
+                                child.onCompleted();
+                            }
+
+                            if (!completed && !error) {
+                                completed = true;
+                            }
+                        }
+                    });
+
+                }
+
+                @Override
+                public void onError(final Throwable e) {
+                    worker.schedule(new Action0() {
+                        @Override
+                        public void call() {
+                            if (!completed && !error) {
+                                error = true;
+                                child.onError(e);
+                                worker.unsubscribe();
+                            }
+
+                        }
+                    });
+
+                }
+
+                @Override
+                public void onNext(final String s) {
+                    final long time = scheduler.now();
+                    last = time;
+                    worker.schedule(new Action0() {
+                        @Override
+                        public void call() {
+                            if (!completed && !error) {
+                                child.onNext(s);
+                            }
+                        }
+                    });
+
+
+                    // schedule LS
+                    worker.schedule(new Action0() {
+                        @Override
+                        public void call() {
+
+                            if (!error && last != null && time == last) {
+                                child.onNext(MorseConst.ls);
+                            }
+                        }
+                    }, (long) (3*unit*1.05), TimeUnit.MILLISECONDS);
+
+                    // schedule WS
+                    worker.schedule(new Action0() {
+                        @Override
+                        public void call() {
+                            if (!error && last != null && time == last) {
+                                child.onNext(MorseConst.ws);
+                            }
+                        }
+                    }, (long) (7*unit*1.05), TimeUnit.MILLISECONDS);
+
+
+                    // schedule CR
+                    worker.schedule(new Action0() {
+                        @Override
+                        public void call() {
+
+                            if (!error && last != null && time == last) {
+                                child.onNext(MorseConst.cr);
+                                if (completed) {
+                                    child.onCompleted();
+                                }
+                            }
+                        }
+                    }, (long) (20*unit*1.05), TimeUnit.MILLISECONDS);
+
+                }
+            };
+
+        }
     }
 
     String threadDescription(String whereAreWe) {
