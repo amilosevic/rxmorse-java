@@ -296,10 +296,12 @@ class Morse extends JPanel implements ActionListener {
                             case "mousedown":
                             case "keydown":
                                 return DOWN;
-                            case MorseConst.ls:
-                            case MorseConst.ws:
-                            case MorseConst.cr:
-                                return st;
+                            case MorseConst.sx3:
+                                return MorseConst.ls;
+                            case MorseConst.sx7:
+                                return MorseConst.ws;
+                            case MorseConst.sx20:
+                                return MorseConst.cr;
                             default:
                                 throw new RuntimeException("!");
                         }
@@ -641,7 +643,7 @@ class Morse extends JPanel implements ActionListener {
                         public void call() {
 
                             if (!error && last != null && time == last) {
-                                child.onNext(MorseConst.ls);
+                                child.onNext(MorseConst.sx3);
                             }
                         }
                     }, (long) (3*unit*1.05), TimeUnit.MILLISECONDS);
@@ -651,7 +653,7 @@ class Morse extends JPanel implements ActionListener {
                         @Override
                         public void call() {
                             if (!error && last != null && time == last) {
-                                child.onNext(MorseConst.ws);
+                                child.onNext(MorseConst.sx7);
                             }
                         }
                     }, (long) (7*unit*1.05), TimeUnit.MILLISECONDS);
@@ -663,7 +665,7 @@ class Morse extends JPanel implements ActionListener {
                         public void call() {
 
                             if (!error && last != null && time == last) {
-                                child.onNext(MorseConst.cr);
+                                child.onNext(MorseConst.sx20);
                                 if (completed) {
                                     child.onCompleted();
                                 }
