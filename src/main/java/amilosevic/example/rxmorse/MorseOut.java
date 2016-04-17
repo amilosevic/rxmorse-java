@@ -2,10 +2,26 @@ package amilosevic.example.rxmorse;
 
 import java.util.HashMap;
 
+public interface MorseOut {
+    /**
+     *
+     * @param key
+     * @return
+     */
+    boolean in(String key);
+
+    /**
+     *
+     * @param key
+     * @return
+     */
+    String[] code(String key);
+}
+
 /**
  * Created by aca on 4/17/16.
  */
-class MorseOut implements MorseConst {
+class MorseOutImpl implements MorseConst, MorseOut {
 
     private final HashMap<String, String[]> map = new HashMap<>();
 
@@ -13,7 +29,7 @@ class MorseOut implements MorseConst {
      * Constructs an empty <tt>HashMap</tt> with the default initial capacity
      * (16) and the default load factor (0.75).
      */
-    public MorseOut() {
+    public MorseOutImpl() {
         super();
 
         out("A", dit, dah);
@@ -61,12 +77,19 @@ class MorseOut implements MorseConst {
         map.put(key, code);
     }
 
+    @Override
     public boolean in(String key) {
         return map.containsKey(key);
     }
 
+    @Override
     public String[] code(String key) {
         return map.get(key);
     }
 
+    /**
+     * Created by aca on 4/17/16.
+     */
+
 }
+

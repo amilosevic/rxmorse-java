@@ -56,16 +56,19 @@ public class RxMorse extends JFrame {
      * @see javax.swing.JComponent#getDefaultLocale
      */
     public RxMorse() throws HeadlessException {
+
+        final MorseOut morseOut = new MorseOutImpl();
+        final MorseIn morseIn = new MorseInImpl();
+
         //super();
         setSize(new Dimension(WIDTH, HEIGHT));
-        add(new Morse());
+        add(new Morse(morseIn, morseOut));
 
         setLocationRelativeTo(null);
         setResizable(false);
         setTitle(TITLE);
 
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-
 
     }
 
@@ -92,7 +95,7 @@ class Morse extends JPanel implements ActionListener {
      * Creates a new <code>JPanel</code> with a double buffer
      * and a flow layout.
      */
-    public Morse() {
+    public Morse(final MorseIn morseIn, final MorseOut morseOut) {
         super();
 
         final JTextArea ticker = new JTextArea();
@@ -143,8 +146,6 @@ class Morse extends JPanel implements ActionListener {
 
         final Clip clip = speaker();
 
-        final MorseOut morseOut = new MorseOut();
-        final MorseIn morseIn = new MorseIn();
 
 
         // event gatherer
@@ -171,7 +172,7 @@ class Morse extends JPanel implements ActionListener {
         }).map(new Func1<ActionEvent, String>() {
             @Override
             public String call(ActionEvent actionEvent) {
-                return qbf;
+                return sos;
             }
         });
 
@@ -579,8 +580,6 @@ class Morse extends JPanel implements ActionListener {
             final Scheduler.Worker worker = scheduler.createWorker();
             child.add(worker);
 
-            System.out.println("call() " + child.toString());
-
             return new Subscriber<String>(child) {
 
                 boolean completed = false;
@@ -688,174 +687,6 @@ final class State {
     boolean completed = false;
 }
 
-
-interface MorseConst {
-    static final String dit = "=";
-    static final String dah = "===";
-
-    static final String s = "."; // space
-    static final String sx3 = "..."; // letter space
-    static final String sx7 = "......."; // word space
-    static final String sx20 = "...................."; // sentance space = cariage return
-
-    static final String ls = "LS";
-    static final String ws = "WS";
-    static final String cr = "CR";
-
-
-}
-
-class MorseIn implements MorseConst {
-
-    public static final String TOP = "__top__";
-    public static final String ERR = "__err__";
-    private final HashMap<String, Node> map = new HashMap<>();
-
-    /**
-     * Constructs an empty <tt>HashMap</tt> with the default initial capacity
-     * (16) and the default load factor (0.75).
-     */
-    public MorseIn() {
-        super();
-        // 0 level
-        in(TOP, "T", "E");
-
-        // I level
-        in("T", "M", "N");
-        in("E", "A", "I");
-
-        // II level
-        in("M", "O", "G");
-        in("N", "K", "D");
-        in("A", "W", "R");
-        in("I", "U", "S");
-
-        // III level
-        in("O", "CH", "Ö");
-        in("G", "Q", "Z");
-        in("K", "Y", "C");
-        in("D", "X", "B");
-        in("W", "J", "P");
-        in("R", "Ä", "L");
-        in("U", "Ü", "F");
-        in("S", "V", "H");
-
-        // IV level
-        in("CH", "0", "9");
-        in("Ö", ERR, "8");
-        in("Q", "Ñ", "Ĝ");
-        in("Z", ERR, "7");
-        in("Y", ERR, "Ĥ");
-        in("C", ERR, "Ç");
-        in("X", ERR, "/");
-        in("B", "=", "6");
-        in("J", "1", "Ĵ");
-        in("P", "Á", "Þ");
-        in("Ä", ERR, "+");
-        in("L", "È", ERR);
-        in("Ü", "2", "Đ");
-        in("F", ERR, "É");
-        in("V", "3", "Ŝ");
-        in("H", "4", "5");
-
-    }
-
-    private void in(final String node, final String left, final String right) {
-        map.put(node, new Node(left, right));
-    }
-
-    public String down(final String key, final String symbol) {
-        if (!map.containsKey(key)) {
-            return ERR;
-        }
-
-        final Node node = map.get(key);
-        if (symbol.equals(MorseConst.dah)) {
-            return node.dah;
-        } else if (symbol.equals(MorseConst.dit)) {
-            return node.dit;
-        } else {
-            throw new RuntimeException("node");
-        }
-    }
-
-    private static class Node {
-        public final String dah;
-        public final String dit;
-
-        public Node(String dah, String dit) {
-            this.dah = dah;
-            this.dit = dit;
-        }
-    }
-}
-
-
-class MorseOut implements MorseConst {
-
-    private final HashMap<String, String[]> map = new HashMap<>();
-
-    /**
-     * Constructs an empty <tt>HashMap</tt> with the default initial capacity
-     * (16) and the default load factor (0.75).
-     */
-    public MorseOut() {
-        super();
-
-        out("A", dit, dah);
-        out("B", dah, dit, dit, dit);
-        out("C", dah, dit, dah, dit);
-        out("D", dah, dit, dit);
-        out("E", dit);
-        out("F", dit, dit, dah, dit);
-        out("G", dah, dah, dit);
-        out("H", dit, dit, dit, dit);
-        out("I", dit, dit);
-        out("J", dit, dah, dah, dah);
-        out("K", dah, dit, dah);
-        out("L", dit, dah, dit, dit);
-        out("M", dah, dah);
-        out("N", dah, dit);
-        out("O", dah, dah, dah);
-        out("P", dit, dah, dah, dit);
-        out("Q", dah, dah, dit, dah);
-        out("R", dit, dah, dit);
-        out("S", dit, dit, dit);
-        out("T", dah);
-        out("U", dit, dit, dah);
-        out("V", dit, dit, dit, dah);
-        out("W", dit, dah, dah);
-        out("X", dah, dit, dit, dah);
-        out("Y", dah, dit, dah, dah);
-        out("Z", dah, dah, dit, dit);
-
-        out("1", dit, dah, dah, dah, dah);
-        out("2", dit, dit, dah, dah, dah);
-        out("3", dit, dit, dit, dah, dah);
-        out("4", dit, dit, dit, dit, dah);
-        out("5", dit, dit, dit, dit, dit);
-        out("6", dah, dit, dit, dit, dit);
-        out("7", dah, dah, dit, dit, dit);
-        out("8", dah, dah, dah, dit, dit);
-        out("9", dah, dah, dah, dah, dit);
-        out("0", dah, dah, dah, dah, dah);
-
-
-    }
-
-    private void out(String key, String... code) {
-        map.put(key, code);
-    }
-
-    public boolean in(String key) {
-        return map.containsKey(key);
-    }
-
-    public String[] code(String key) {
-        return map.get(key);
-    }
-
-}
 
 abstract class Action {
 

@@ -5,9 +5,30 @@ import java.util.HashMap;
 /**
  * Created by aca on 4/17/16.
  */
-class MorseIn implements MorseConst {
+public interface MorseIn {
 
+    /**
+     *
+     */
     public static final String TOP = "__top__";
+
+    /**
+     *
+     * @param key
+     * @param symbol
+     * @return
+     */
+    String down(String key, String symbol);
+}
+
+
+/**
+ * Created by aca on 4/17/16.
+ */
+
+class MorseInImpl implements MorseConst, MorseIn {
+
+
     public static final String ERR = "__err__";
     private final HashMap<String, Node> map = new HashMap<>();
 
@@ -15,7 +36,7 @@ class MorseIn implements MorseConst {
      * Constructs an empty <tt>HashMap</tt> with the default initial capacity
      * (16) and the default load factor (0.75).
      */
-    public MorseIn() {
+    public MorseInImpl() {
         super();
         // 0 level
         in(TOP, "T", "E");
@@ -64,6 +85,7 @@ class MorseIn implements MorseConst {
         map.put(node, new Node(left, right));
     }
 
+    @Override
     public String down(final String key, final String symbol) {
         if (!map.containsKey(key)) {
             return ERR;
