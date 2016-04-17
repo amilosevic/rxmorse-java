@@ -142,7 +142,7 @@ class Morse extends JPanel implements ActionListener {
         pane.setBounds(10, 260 + 10, 250, 260);
 
         // mechanics
-        final int unit = 150;
+        final int unit = 150; // ~ 18 wpm  (T = 1200 / W)
 
         final Clip clip = speaker();
 
