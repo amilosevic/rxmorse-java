@@ -242,7 +242,11 @@ class Morse extends JPanel implements ActionListener {
                                 } else if ("\n".equals(s)) {
                                     return Observable.just(MorseConst.sx20);
                                 } else {
-                                    return Observable.error(new Error("** " + s));
+                                    // emit question mark for any unknown character
+                                    return Observable.concat(
+                                            Observable.from(morseOut.code("?")),
+                                            Observable.just(MorseConst.sx3)
+                                    );
                                 }
                             }
                         })

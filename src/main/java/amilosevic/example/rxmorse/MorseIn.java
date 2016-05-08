@@ -79,6 +79,9 @@ class MorseInImpl implements MorseConst, MorseIn {
         in("V", "3", "Ŝ");
         in("H", "4", "5");
 
+        // V level
+        in ("Đ", "?", "_");
+
     }
 
     private void in(final String node, final String left, final String right) {

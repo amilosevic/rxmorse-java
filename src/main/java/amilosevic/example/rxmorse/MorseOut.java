@@ -70,6 +70,8 @@ class MorseOutImpl implements MorseConst, MorseOut {
         out("9", dah, dah, dah, dah, dit);
         out("0", dah, dah, dah, dah, dah);
 
+        out("?", dit, dit, dah, dah, dit, dah);
+
 
     }
 
