@@ -640,42 +640,44 @@ class Morse extends JPanel implements ActionListener {
                         }
                     });
 
+                    if (s.endsWith("up") || s.endsWith("end")) {
 
-                    // schedule LS
-                    worker.schedule(new Action0() {
-                        @Override
-                        public void call() {
+                        // schedule LS
+                        worker.schedule(new Action0() {
+                            @Override
+                            public void call() {
 
-                            if (!error && last != null && time == last) {
-                                child.onNext(MorseConst.sx3);
-                            }
-                        }
-                    }, (long) (3*unit*1.05), TimeUnit.MILLISECONDS);
-
-                    // schedule WS
-                    worker.schedule(new Action0() {
-                        @Override
-                        public void call() {
-                            if (!error && last != null && time == last) {
-                                child.onNext(MorseConst.sx7);
-                            }
-                        }
-                    }, (long) (7*unit*1.05), TimeUnit.MILLISECONDS);
-
-
-                    // schedule CR
-                    worker.schedule(new Action0() {
-                        @Override
-                        public void call() {
-
-                            if (!error && last != null && time == last) {
-                                child.onNext(MorseConst.sx20);
-                                if (completed) {
-                                    child.onCompleted();
+                                if (!error && last != null && time == last) {
+                                    child.onNext(MorseConst.sx3);
                                 }
                             }
-                        }
-                    }, (long) (20*unit*1.05), TimeUnit.MILLISECONDS);
+                        }, (long) (3 * unit * 1.05), TimeUnit.MILLISECONDS);
+
+                        // schedule WS
+                        worker.schedule(new Action0() {
+                            @Override
+                            public void call() {
+                                if (!error && last != null && time == last) {
+                                    child.onNext(MorseConst.sx7);
+                                }
+                            }
+                        }, (long) (7 * unit * 1.05), TimeUnit.MILLISECONDS);
+
+
+                        // schedule CR
+                        worker.schedule(new Action0() {
+                            @Override
+                            public void call() {
+
+                                if (!error && last != null && time == last) {
+                                    child.onNext(MorseConst.sx20);
+                                    if (completed) {
+                                        child.onCompleted();
+                                    }
+                                }
+                            }
+                        }, (long) (20 * unit * 1.05), TimeUnit.MILLISECONDS);
+                    }
 
                 }
             };
